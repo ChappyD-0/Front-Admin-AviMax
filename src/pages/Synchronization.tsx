@@ -1,5 +1,6 @@
+import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { RefreshCw, CheckCircle, Clock, AlertCircle, WifiOff, XCircle } from 'lucide-react'
+import { RefreshCw, CheckCircle, WifiOff, XCircle, X, AlertTriangle, Loader2 } from 'lucide-react'
 import { getDashboardGeneral } from '../api/dashboard'
 import LoadingState from '../components/common/LoadingState'
 import ErrorState from '../components/common/ErrorState'
@@ -7,21 +8,94 @@ import RefreshButton from '../components/common/RefreshButton'
 import type { GatewayEstado } from '../types'
 
 const syncStateConfig = {
-  CONECTADO:    { label: 'Conectado',   color: 'text-green-600', bg: 'bg-green-50',  icon: <CheckCircle size={16} /> },
-  DESCONECTADO: { label: 'Desconectado', color: 'text-red-600',   bg: 'bg-red-50',    icon: <XCircle size={16} /> },
-  SIN_DATOS:    { label: 'Sin datos',   color: 'text-slate-400', bg: 'bg-slate-50',  icon: <WifiOff size={16} /> },
-  ERROR:        { label: 'Error',       color: 'text-red-600',   bg: 'bg-red-50',    icon: <AlertCircle size={16} /> },
+  ONLINE:    { label: 'Online',     color: 'text-green-600', bg: 'bg-green-50', icon: <CheckCircle size={16} /> },
+  OFFLINE:   { label: 'Offline',    color: 'text-red-600',   bg: 'bg-red-50',   icon: <XCircle size={16} /> },
+  SIN_DATOS: { label: 'Sin datos',  color: 'text-slate-400', bg: 'bg-slate-50', icon: <WifiOff size={16} /> },
 } satisfies Record<GatewayEstado, { label: string; color: string; bg: string; icon: React.ReactNode }>
 
+type ToastState =
+  | { type: 'loading' }
+  | { type: 'success'; at: Date }
+  | { type: 'error'; message: string }
+  | null
+
+function RefreshToast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
+  if (!toast) return null
+
+  const styles = {
+    loading: 'bg-slate-800 text-white border-slate-700',
+    success: 'bg-green-700 text-white border-green-600',
+    error:   'bg-red-700 text-white border-red-600',
+  }
+
+  const icon = {
+    loading: <Loader2 size={16} className="animate-spin shrink-0" />,
+    success: <CheckCircle size={16} className="shrink-0" />,
+    error:   <AlertTriangle size={16} className="shrink-0" />,
+  }
+
+  const message = {
+    loading: 'Actualizando datos...',
+    success: `Datos actualizados · ${(toast as { at: Date }).at?.toLocaleTimeString('es-MX')}`,
+    error:   (toast as { message: string }).message,
+  }
+
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg text-sm font-medium transition-all ${styles[toast.type]}`}>
+      {icon[toast.type]}
+      <span className="flex-1">{message[toast.type]}</span>
+      {toast.type !== 'loading' && (
+        <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100 transition-opacity">
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function Synchronization() {
+  const [toast, setToast] = useState<ToastState>(null)
+  const wasManualRefresh = useRef(false)
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboardGeneral,
     refetchInterval: 15_000,
   })
 
+  useEffect(() => {
+    if (!wasManualRefresh.current) return
+
+    if (isFetching) {
+      setToast({ type: 'loading' })
+      return
+    }
+
+    if (isError) {
+      setToast({ type: 'error', message: (error as Error).message })
+      wasManualRefresh.current = false
+      return
+    }
+
+    setToast({ type: 'success', at: new Date() })
+    wasManualRefresh.current = false
+
+    if (dismissTimer.current) clearTimeout(dismissTimer.current)
+    dismissTimer.current = setTimeout(() => setToast(null), 5000)
+  }, [isFetching, isError, error])
+
+  useEffect(() => () => {
+    if (dismissTimer.current) clearTimeout(dismissTimer.current)
+  }, [])
+
+  const handleRefresh = () => {
+    wasManualRefresh.current = true
+    refetch()
+  }
+
   if (isLoading) return <LoadingState message="Cargando estado de sincronización..." />
-  if (isError) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
+  if (isError && !toast) return <ErrorState message={(error as Error).message} onRetry={handleRefresh} />
 
   return (
     <div className="space-y-5">
@@ -32,8 +106,10 @@ export default function Synchronization() {
             Monitorea la comunicación entre el servidor central y los backends locales.
           </p>
         </div>
-        <RefreshButton onClick={() => refetch()} loading={isFetching} />
+        <RefreshButton onClick={handleRefresh} loading={isFetching} />
       </div>
+
+      <RefreshToast toast={toast} onClose={() => setToast(null)} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {data!.galpones.map((g) => {
@@ -64,8 +140,7 @@ export default function Synchronization() {
                   <span>
                     {g.ultimaLectura
                       ? new Date(g.ultimaLectura).toLocaleString('es-MX')
-                      : <span className="text-slate-400 italic">Sin lecturas</span>
-                    }
+                      : <span className="text-slate-400 italic">Sin lecturas</span>}
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-600">
@@ -82,7 +157,6 @@ export default function Synchronization() {
                 </div>
               )}
 
-              {/* MQTT Topics hint */}
               <div className="border-t border-white/60 pt-3 space-y-1 text-xs text-slate-500">
                 <p className="font-medium text-slate-400 mb-1">Tópicos MQTT</p>
                 <p className="font-mono">avicola/galpon/{g.galponId}/lecturas</p>

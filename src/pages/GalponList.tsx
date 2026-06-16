@@ -1,15 +1,28 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { PlusCircle, ArrowRight, Server } from 'lucide-react'
-import { getGalpones } from '../api/provisioning'
+import { PlusCircle, ArrowRight } from 'lucide-react'
+import { getAllGalpones } from '../api/galpones'
 import LoadingState from '../components/common/LoadingState'
 import ErrorState from '../components/common/ErrorState'
 import EmptyState from '../components/common/EmptyState'
+import type { GalponEstadoCrud } from '../types'
+
+const estadoStyles: Record<GalponEstadoCrud, string> = {
+  ACTIVO:       'bg-green-100 text-green-700',
+  INACTIVO:     'bg-slate-100 text-slate-500',
+  MANTENIMIENTO:'bg-yellow-100 text-yellow-700',
+}
+
+const estadoLabel: Record<GalponEstadoCrud, string> = {
+  ACTIVO:        'Activo',
+  INACTIVO:      'Inactivo',
+  MANTENIMIENTO: 'Mantenimiento',
+}
 
 export default function GalponList() {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['galpones'],
-    queryFn: getGalpones,
+    queryFn: getAllGalpones,
   })
 
   if (isLoading) return <LoadingState />
@@ -45,44 +58,41 @@ export default function GalponList() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-left">
-                <th className="px-5 py-3 font-semibold text-slate-600">ID</th>
                 <th className="px-5 py-3 font-semibold text-slate-600">Código</th>
                 <th className="px-5 py-3 font-semibold text-slate-600">Nombre</th>
-                <th className="px-5 py-3 font-semibold text-slate-600">Gateway</th>
+                <th className="px-5 py-3 font-semibold text-slate-600">Ubicación</th>
+                <th className="px-5 py-3 font-semibold text-slate-600">Responsable</th>
+                <th className="px-5 py-3 font-semibold text-slate-600">Capacidad</th>
+                <th className="px-5 py-3 font-semibold text-slate-600">Estado</th>
                 <th className="px-5 py-3 font-semibold text-slate-600">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data!.map((g) => (
-                <tr key={g.galponId} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3 text-slate-400 font-mono">#{g.galponId}</td>
+                <tr key={g.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-5 py-3">
                     <span className="font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs">
-                      {g.galponCode}
+                      {g.codigo}
                     </span>
                   </td>
-                  <td className="px-5 py-3 font-medium text-slate-800">{g.galponName}</td>
+                  <td className="px-5 py-3 font-medium text-slate-800">{g.nombre}</td>
+                  <td className="px-5 py-3 text-slate-500">{g.ubicacion || '—'}</td>
+                  <td className="px-5 py-3 text-slate-500">{g.responsable || '—'}</td>
+                  <td className="px-5 py-3 text-slate-500">
+                    {g.capacidadAves ? g.capacidadAves.toLocaleString('es-MX') : '—'}
+                  </td>
                   <td className="px-5 py-3">
-                    <span className="inline-flex items-center gap-1.5 text-slate-500 text-xs">
-                      <Server size={12} />
-                      {g.gatewayCode}
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${estadoStyles[g.estado]}`}>
+                      {estadoLabel[g.estado]}
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <Link
-                        to={`/galpones/${g.galponId}`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 text-xs font-medium"
-                      >
-                        Detalle <ArrowRight size={12} />
-                      </Link>
-                      <Link
-                        to={`/galpones/${g.galponId}/provisioning`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 text-xs font-medium"
-                      >
-                        Provisioning
-                      </Link>
-                    </div>
+                    <Link
+                      to={`/galpones/${g.id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 text-xs font-medium"
+                    >
+                      Ver detalle <ArrowRight size={12} />
+                    </Link>
                   </td>
                 </tr>
               ))}

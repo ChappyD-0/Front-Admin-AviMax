@@ -9,9 +9,8 @@ const statusMap: Record<string, { label: string; classes: string }> = {
   MANTENIMIENTO: { label: 'Mantenimiento',  classes: 'bg-yellow-100 text-yellow-800' },
   SIN_DATOS:     { label: 'Sin datos',      classes: 'bg-slate-100 text-slate-500' },
   // Gateway
-  CONECTADO:     { label: 'Conectado',      classes: 'bg-green-100 text-green-800' },
-  DESCONECTADO:  { label: 'Desconectado',   classes: 'bg-red-100 text-red-700' },
-  ERROR:         { label: 'Error',          classes: 'bg-red-100 text-red-700' },
+  ONLINE:        { label: 'Online',         classes: 'bg-green-100 text-green-800' },
+  OFFLINE:       { label: 'Offline',        classes: 'bg-red-100 text-red-700' },
   // Severidad
   NORMAL:        { label: 'Normal',         classes: 'bg-green-100 text-green-800' },
   ADVERTENCIA:   { label: 'Advertencia',    classes: 'bg-yellow-100 text-yellow-800' },
