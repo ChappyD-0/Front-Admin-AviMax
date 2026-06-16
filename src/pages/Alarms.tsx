@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { BellRing } from 'lucide-react'
 import { getActiveAlarms, getAlarmsHistory } from '../api/alarms'
 import AlarmTable from '../components/alarms/AlarmTable'
@@ -15,12 +15,21 @@ type ATab = 'activas' | 'historial'
 
 function TabActivas() {
   const [filterSev, setFilterSev] = useState<AlertaSeveridad | 'ALL'>('ALL')
+  const [refreshStatus, setRefreshStatus] = useState<'ok' | 'error' | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['alarmas-activas'],
     queryFn: getActiveAlarms,
     refetchInterval: 30_000,
   })
+
+  const handleRefetch = async () => {
+    const result = await refetch()
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setRefreshStatus(result.isError ? 'error' : 'ok')
+    timerRef.current = setTimeout(() => setRefreshStatus(null), 3000)
+  }
 
   const filtered = (data ?? []).filter(
     (a) => filterSev === 'ALL' || a.severidad === filterSev
@@ -44,7 +53,7 @@ function TabActivas() {
             </button>
           ))}
         </div>
-        <RefreshButton onClick={() => refetch()} loading={isFetching} />
+        <RefreshButton onClick={handleRefetch} loading={isFetching} status={refreshStatus} />
       </div>
 
       {isLoading ? <LoadingState /> :
@@ -69,15 +78,25 @@ function TabActivas() {
 // ── Tab: Historial ────────────────────────────────────────────────────────────
 
 function TabHistorial() {
+  const [refreshStatus, setRefreshStatus] = useState<'ok' | 'error' | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['alarmas-historial'],
     queryFn: () => getAlarmsHistory(),
   })
 
+  const handleRefetch = async () => {
+    const result = await refetch()
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setRefreshStatus(result.isError ? 'error' : 'ok')
+    timerRef.current = setTimeout(() => setRefreshStatus(null), 3000)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <RefreshButton onClick={() => refetch()} loading={isFetching} />
+        <RefreshButton onClick={handleRefetch} loading={isFetching} status={refreshStatus} />
       </div>
 
       {isLoading ? <LoadingState /> :

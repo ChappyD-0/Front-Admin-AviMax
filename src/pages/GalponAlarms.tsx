@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { BellRing } from 'lucide-react'
 import { getAlarms, getAlarmsHistory } from '../api/alarms'
 import AlarmTable from '../components/alarms/AlarmTable'
@@ -15,16 +15,26 @@ type ATab = 'activas' | 'historial'
 // ── Tab: Activas ──────────────────────────────────────────────────────────────
 
 function TabActivas({ galponId }: { galponId: number }) {
+  const [refreshStatus, setRefreshStatus] = useState<'ok' | 'error' | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['alarmas-galpon', String(galponId)],
     queryFn: () => getAlarms({ galpon_id: galponId }),
     refetchInterval: 30_000,
   })
 
+  const handleRefetch = async () => {
+    const result = await refetch()
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setRefreshStatus(result.isError ? 'error' : 'ok')
+    timerRef.current = setTimeout(() => setRefreshStatus(null), 3000)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <RefreshButton onClick={() => refetch()} loading={isFetching} />
+        <RefreshButton onClick={handleRefetch} loading={isFetching} status={refreshStatus} />
       </div>
 
       {isLoading ? <LoadingState /> :
@@ -48,15 +58,25 @@ function TabActivas({ galponId }: { galponId: number }) {
 // ── Tab: Historial ────────────────────────────────────────────────────────────
 
 function TabHistorial({ galponId }: { galponId: number }) {
+  const [refreshStatus, setRefreshStatus] = useState<'ok' | 'error' | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['alarmas-historial-galpon', String(galponId)],
     queryFn: () => getAlarmsHistory({ galpon_id: galponId }),
   })
 
+  const handleRefetch = async () => {
+    const result = await refetch()
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setRefreshStatus(result.isError ? 'error' : 'ok')
+    timerRef.current = setTimeout(() => setRefreshStatus(null), 3000)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <RefreshButton onClick={() => refetch()} loading={isFetching} />
+        <RefreshButton onClick={handleRefetch} loading={isFetching} status={refreshStatus} />
       </div>
 
       {isLoading ? <LoadingState /> :
